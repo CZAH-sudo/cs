@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线视频播放 - 无跨域版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            padding: 20px;
+            background: #1e1e1e;
+            font-family: "微软雅黑";
+        }
+
+        .video-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+       /* 自适应视频容器（核心：按视频比例自动调整高度） */
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            max-height: 90vh; /* 最大高度不超过屏幕90% */
+            background: #000;
+            border-radius: 8px;
+            border: 1px solid #333;
+            overflow: hidden;
+        }
+        
+        /* 视频样式：等比缩放，完整显示，不拉伸 */
+        #videoPlayer {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* 关键：按比例完整显示视频 */
+            display: block;
+        }
+
+        /* 按钮控制区 */
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        #nextBtn {
+            padding: 12px 26px;
+            border: none;
+            border-radius: 6px;
+            background: #1677ff;
+            color: #fff;
+            font-size: 17px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        /* 连续播放开关 */
+        .auto-play-switch {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+            font-size: 17px;
+        }
+
+        .auto-play-switch input {
+            width: 42px;
+            height: 22px;
+            cursor: pointer;
+        }
+
+        /* 状态提示 */
+        .status {
+            margin-top: 15px;
+            font-size: 16px;
+            line-height: 1.6;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .loading {
+            color: #4fc3f7;
+            background: rgba(79, 195, 247, 0.1);
+        }
+
+        .success {
+            color: #81c784;
+            background: rgba(129, 199, 132, 0.1);
+        }
+
+        .error {
+            color: #e57373;
+            background: rgba(229, 115, 115, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="video-container">
+        <!-- 自适应容器：核心是这个wrapper -->
+        <div class="video-wrapper">
+            <video id="videoPlayer" controls autoplay preload="auto"></video>
+        </div>
+        <div class="controls">
+            <button id="nextBtn">随机播放</button>
+            <div class="auto-play-switch">
+                <input type="checkbox" id="autoPlaySwitch">
+                <label for="autoPlaySwitch">开启连续播放</label>
+            </div>
+        </div>
+        <div id="statusText" class="status loading">正在加载视频，请稍候...</div>
+    </div>
+
+    <script>
+        // ===== 全局变量 & 核心配置 =====
+        const videoPlayer = document.getElementById('videoPlayer');
+        const nextBtn = document.getElementById('nextBtn');
+        const autoPlaySwitch = document.getElementById('autoPlaySwitch');
+        const statusText = document.getElementById('statusText');
+        let errorCount = 0; // 累计失败次数
+        const MAX_ERROR_TIMES = 5; // 最多失败5次
+        const VIDEO_SRC_API = 'http://api.yujn.cn/api/zzxjj.php?t='; // 你的视频接口
+
+        // ===== 核心方法：加载播放视频 =====
+        function loadNextVideo() {
+            // 失败满5次，停止请求+提示+禁用按钮
+            if (errorCount >= MAX_ERROR_TIMES) {
+                setStatus(`❌ 连续加载失败${MAX_ERROR_TIMES}次，已停止请求！`, 'error');
+                return;
+            }
+
+            // 拼接随机数，防止缓存，和你要求的写法完全一致
+            const videoSrc = VIDEO_SRC_API + Math.random();
+            setStatus('⏳ 正在切换下一个视频...', 'loading');
+
+            // 直接绑定src，核心解决跨域的方案
+            videoPlayer.src = videoSrc;
+            videoPlayer.play().catch(err => { }); // 自动播放，捕获静默报错不影响使用
+        }
+
+        // ===== 设置状态提示文本 =====
+        function setStatus(text, type) {
+            statusText.innerText = text;
+            statusText.className = `status ${type}`;
+        }
+
+        // ===== 视频播放相关事件监听 =====
+        // 1. 视频加载成功，开始播放
+        videoPlayer.addEventListener('loadeddata', () => {
+            errorCount = 0; // 成功则重置失败次数
+            setStatus('✅ 视频加载成功，正在播放', 'success');
+        });
+
+        // 2. 视频播放完成事件 - 连续播放核心逻辑
+        videoPlayer.addEventListener('ended', () => {
+            setStatus('▶️ 当前视频播放完毕', 'success');
+            // 如果开启连续播放开关，自动加载下一个
+            if (autoPlaySwitch.checked) {
+                loadNextVideo();
+            }
+        });
+
+        // 3. 视频加载/播放失败事件 - 累计失败次数
+        videoPlayer.addEventListener('error', () => {
+            errorCount++;
+            setStatus(`❌ 视频加载失败，已失败 ${errorCount}/${MAX_ERROR_TIMES} 次`, 'error');
+            // 失败后自动重试一次，直到达到5次上限
+            if (errorCount < MAX_ERROR_TIMES) {
+                setTimeout(() => loadNextVideo(), 600);
+            }
+        });
+
+        // 4. 点击【播放下一个】按钮，手动加载
+        nextBtn.addEventListener('click', () => {
+            errorCount = 0;
+            loadNextVideo();
+        });
+
+        // ===== 页面初始化，加载第一个视频 =====
+        window.onload = loadNextVideo;
+    </script>
+</body>
+
+</html>
