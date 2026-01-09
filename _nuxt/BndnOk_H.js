@@ -1,1 +1,0 @@
-import{_ as n,c as o,o as s,y as r}from"./BaDf8LR7.js";const c={};function t(e,a){return s(),o("code",null,[r(e.$slots,"default")])}const _=Object.assign(n(c,[["render",t]]),{__name:"ProseCodeInline"});export{_ as default};
